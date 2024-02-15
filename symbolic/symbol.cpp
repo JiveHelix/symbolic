@@ -9,11 +9,17 @@
   * Licensed under the MIT license. See LICENSE file.
 **/
 
+#include <locale>
 #include <jive/strings.h>
 
+#include "settings.h"
 #include "symbol.h"
 #include "named.h"
 #include "value.h"
+#include "greek.h"
+
+
+#include <iostream>
 
 
 Symbol::~Symbol()
@@ -50,7 +56,40 @@ size_t Symbol::GetDisplayWidth() const
 {
     std::ostringstream stringStream;
     this->ToStream(stringStream);
-    return stringStream.str().size();
+
+    auto s = stringStream.str();
+
+    size_t count = 0;
+    size_t index = 0;
+
+    while (index < s.size())
+    {
+        char c = s[index];
+
+        index += 1;
+
+        if (c & 0x80)
+        {
+            if (c & 0x40)
+            {
+                index += 1;
+
+                if (c & 0x20)
+                {
+                    index += 1;
+
+                    if (c & 0x10)
+                    {
+                        index += 1;
+                    }
+                }
+            }
+        }
+
+        count += 1;
+    }
+
+    return count;
 }
 
 
@@ -101,25 +140,51 @@ typename Symbol::Pointer operator/(
 
 std::ostream & operator<<(std::ostream &output, const Op &op)
 {
-    switch (op)
+    if (settings::printCompact)
     {
-        case Op::add:
-            return output << " + ";
+        switch (op)
+        {
+            case Op::add:
+                return output << "+";
 
-        case Op::subtract:
-            return output << " - ";
+            case Op::subtract:
+                return output << "-";
 
-        case Op::multiply:
-            return output << " * ";
+            case Op::multiply:
+                return output << "*";
 
-        case Op::divide:
-            return output << " / ";
+            case Op::divide:
+                return output << "/";
 
-        case Op::none:
-            return output << " ";
+            case Op::none:
+                return output << "";
 
-        default:
-            throw std::logic_error("Invalid operator");
+            default:
+                throw std::logic_error("Invalid operator");
+        }
+    }
+    else
+    {
+        switch (op)
+        {
+            case Op::add:
+                return output << " + ";
+
+            case Op::subtract:
+                return output << " - ";
+
+            case Op::multiply:
+                return output << " * ";
+
+            case Op::divide:
+                return output << " / ";
+
+            case Op::none:
+                return output << " ";
+
+            default:
+                throw std::logic_error("Invalid operator");
+        }
     }
 }
 
@@ -163,6 +228,64 @@ bool operator<(typename Symbol::Pointer left, typename Symbol::Pointer right)
 }
 
 
+std::map<std::string, std::shared_ptr<Arg>> args_;
+
+
+Arg::Arg(const std::string &name)
+    :
+    std::string(name)
+{
+
+}
+
+
+void Arg::ClearValue()
+{
+    this->value_.reset();
+}
+
+
+void Arg::SetValue(double value)
+{
+    this->value_ = value;
+}
+
+
+std::optional<double> Arg::GetValue() const
+{
+    return this->value_;
+}
+
+
+std::shared_ptr<Arg> Arg::CreateShared_(const std::string &name)
+{
+    auto arg = new Arg(name);
+
+    try
+    {
+        return std::shared_ptr<Arg>(arg);
+    }
+    catch (...)
+    {
+        delete arg;
+        throw;
+    }
+}
+
+
+std::shared_ptr<Arg> Arg::Get(const std::string &name)
+{
+    if (args_.count(name))
+    {
+        return args_[name];
+    }
+
+    args_[name] = Arg::CreateShared_(name);
+
+    return args_[name];
+}
+
+
 static const std::vector<std::string> trigNames
     {"sin", "cos", "tan", "sec", "csc", "cot"};
 
@@ -173,13 +296,23 @@ static const std::map<std::string, int> trigSortOrder{
     {"tan", 2},
     {"sec", 3},
     {"csc", 4},
-    {"cot", 5}};
+    {"cot", 5}
+};
+
+
+static const std::map<std::string, std::string> shortTrigNames{
+    {"sin", "s"},
+    {"cos", "c"},
+    {"tan", "t"},
+    {"sec", "se"},
+    {"csc", "cs"},
+    {"cot", "ct"}
+};
 
 
 bool IsTrigName(const std::string &name)
 {
-
-    if (name.size() < 3)
+    if (name.size() != 3)
     {
         return false;
     }
@@ -194,9 +327,43 @@ bool IsTrigName(const std::string &name)
 }
 
 
+double GetTrigValue(const std::string &name, double argValue)
+{
+    // isTrig_
+    if (name == "sin")
+    {
+        return std::sin(argValue);
+    }
+    else if (name == "cos")
+    {
+        return std::cos(argValue);
+    }
+    else if (name == "tan")
+    {
+        return std::tan(argValue);
+    }
+    else if (name == "sec")
+    {
+        return 1.0 / std::cos(argValue);
+    }
+    else if (name == "csc")
+    {
+        return 1.0 / std::sin(argValue);
+    }
+    else if (name == "cot")
+    {
+        return 1.0 / std::tan(argValue);
+    }
+    else
+    {
+        throw std::logic_error("Not a supported trig function");
+    }
+}
+
+
 SymbolName::SymbolName(const std::string &name)
     :
-    name_{name},
+    name_{},
     arg_{},
     isTrig_(IsTrigName(name))
 {
@@ -204,21 +371,29 @@ SymbolName::SymbolName(const std::string &name)
     {
         this->name_ = name.substr(0, 3);
         auto arg = jive::strings::Trim(name.substr(3));
-        this->arg_ = jive::strings::Trim(arg, "()");
+        this->arg_ = Arg::Get(jive::strings::Trim(arg, "()"));
+    }
+    else
+    {
+        this->arg_ = Arg::Get(name);
     }
 }
 
 
 SymbolName::SymbolName(const std::string &name, const std::string &arg)
     :
-    name_{name},
-    arg_{arg},
+    name_{},
+    arg_{},
     isTrig_(IsTrigName(name))
 {
-    if (this->isTrig_)
+    if (!this->isTrig_)
     {
-        this->name_ = name.substr(0, 3);
+        throw std::runtime_error(
+            "This constructor is only for trig functions.");
     }
+
+    this->name_ = name;
+    this->arg_ = Arg::Get(arg);
 }
 
 
@@ -237,20 +412,30 @@ std::ostream & SymbolName::ToStream(
 
     if (this->isTrig_)
     {
-        if (*powerValue != 1)
+        std::string name;
+        if (settings::printCompact)
         {
-            return output << this->name_ << "^" << *powerValue << "(" << this->arg_ << ")";
+            name = shortTrigNames.at(this->name_);
+        }
+        else
+        {
+            name = this->name_;
         }
 
-        return output << this->name_ << "(" << this->arg_ << ")";
+        if (*powerValue != 1)
+        {
+            return output << name << "^" << *powerValue << "(" << *this->arg_ << ")";
+        }
+
+        return output << name << "(" << *this->arg_ << ")";
     }
 
     if (*powerValue != 1)
     {
-        return output << this->name_ << "^" << *powerValue;
+        return output << *this->arg_ << "^" << *powerValue;
     }
 
-    return output << this->name_;
+    return output << *this->arg_;
 }
 
 
@@ -265,7 +450,7 @@ std::string SymbolName::GetName() const
 
 bool SymbolName::operator==(const SymbolName &other) const
 {
-    return this->name_ == other.name_ && this->arg_ == other.arg_;
+    return this->name_ == other.name_ && this->arg_.get() == other.arg_.get();
 }
 
 
@@ -277,17 +462,22 @@ bool SymbolName::operator!=(const SymbolName &other) const
 
 bool SymbolName::operator<(const SymbolName &other) const
 {
-    if (this->name_ == other.name_)
-    {
-        return this->arg_ < other.arg_;
-    }
-
     if (this->isTrig_)
     {
-        return trigSortOrder.at(this->name_) < trigSortOrder.at(other.name_);
+        if (greek::IsGreek(*this->arg_) && greek::IsGreek(*other.arg_))
+        {
+            return greek::sortOrder.at(*this->arg_)
+                < greek::sortOrder.at(*other.arg_);
+        }
+        else
+        {
+            return *this->arg_ < *other.arg_;
+        }
     }
+    
+    assert(this->name_.empty());
 
-    return this->name_ < other.name_;
+    return *this->arg_ < *other.arg_;
 }
 
 
@@ -318,13 +508,13 @@ S::S(int value)
 }
 
 
-S::S(const char *name)
+S::S(const std::string &name)
 {
     this->Base::operator=(std::make_shared<Named>(SymbolName(name)));
 }
 
 
-S::S(const char *name, const char *arg)
+S::S(const std::string &name, const std::string &arg)
 {
     this->Base::operator=(std::make_shared<Named>(SymbolName(name, arg)));
 }
@@ -367,6 +557,8 @@ S operator-(S left, S right)
 
         if (valuePointer->operator==(0))
         {
+            // left operand is a value equal to 0.
+            // 0 - right is -right.
             return S(-1) * right;
         }
     }
@@ -378,6 +570,8 @@ S operator-(S left, S right)
 
         if (valuePointer->operator==(0))
         {
+            // right operand is equal to 0.
+            // left - 0 is left.
             return left;
         }
     }
@@ -398,3 +592,7 @@ S operator/(S left, S right)
 }
 
 
+S operator^(S left, S right)
+{
+    return left->MultiplyPower(right);
+}

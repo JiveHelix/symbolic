@@ -5,6 +5,27 @@ target_link_libraries(
     PUBLIC
     project_warnings
     project_options
+    symbolic
+    CONAN_PKG::tau)
+
+
+add_executable(angle_sums angle_sums.cpp)
+
+target_link_libraries(
+    angle_sums
+    PUBLIC
+    project_warnings
+    project_options
+    symbolic)
+
+
+add_executable(algebra algebra.cpp)
+
+target_link_libraries(
+    algebra
+    PUBLIC
+    project_warnings
+    project_options
     symbolic)
 
 

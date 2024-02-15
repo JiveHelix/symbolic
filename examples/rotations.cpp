@@ -12,87 +12,124 @@
 #include <iostream>
 #include <symbolic/symbolic.h>
 #include <symbolic/greek.h>
+#include <symbolic/angle_sums.h>
 #include <fmt/core.h>
+#include <tau/angles.h>
 
 
 using namespace greek;
 
 
+struct NamedMatrix
+{
+    std::shared_ptr<Arg> arg;
+    std::string name;
+    std::string axis;
+    Matrix matrix;
+
+    NamedMatrix(const std::string &arg_, const std::string &axis_)
+        :
+        arg(Arg::Get(arg_)),
+        name(fmt::format("R({})", arg_)),
+        axis(axis_),
+        matrix(3, 3)
+    {
+
+    }
+
+    void Print() const
+    {
+        fmt::print(
+            "{} (rotation about the {} axis):\n",
+            this->name,
+            this->axis);
+
+        std::cout << this->matrix << std::endl;
+    }
+};
+
+
+void PrintRotation(
+    const NamedMatrix &first,
+    const NamedMatrix &second,
+    const NamedMatrix &third)
+{
+    auto product = fmt::format(
+        " {} * {} * {} ",
+        first.name,
+        second.name,
+        third.name);
+
+    fmt::print("\n{:*^79}\n", product);
+
+    std::cout << first.matrix * second.matrix * third.matrix << std::endl;
+
+    std::cout << "\nSetting " << *second.arg << " to pi/2" << std::endl;
+    second.arg->SetValue(tau::Angles<double>::pi / 2);
+    auto matrix1 = first.matrix * second.matrix * third.matrix;
+    std::cout << matrix1 << std::endl;
+    std::cout << "\nUsing angle sum/difference identities" << std::endl;
+    std::cout << ReplaceAngleSums(matrix1) << std::endl;
+
+    std::cout << "\nSetting " << *second.arg << " to -pi/2" << std::endl;
+    second.arg->SetValue(-tau::Angles<double>::pi / 2);
+
+    auto matrix2 = first.matrix * second.matrix * third.matrix;
+    std::cout << matrix2 << std::endl;
+
+    std::cout << "\nUsing angle sum/difference identities" << std::endl;
+    std::cout << ReplaceAngleSums(matrix2) << std::endl;
+
+    second.arg->ClearValue();
+}
+
+
 int main()
 {
-    Matrix alphaMatrix(3, 3);
-    Matrix betaMatrix(3, 3);
-    Matrix gammaMatrix(3, 3);
+    std::string sin("sin");
+    std::string cos("cos");
 
-    auto sinAlpha = S{"sin", small::alpha};
-    auto cosAlpha = S{"cos", small::alpha};
+    NamedMatrix alpha(small::alpha, "x");
+    NamedMatrix beta(small::beta, "y");
+    NamedMatrix gamma(small::gamma, "z");
 
-    alphaMatrix.Assign(
+    auto sinAlpha = S{sin, small::alpha};
+    auto cosAlpha = S{cos, small::alpha};
+
+    alpha.matrix.Assign(
         1, 0, 0,
         0, cosAlpha, -1 * sinAlpha,
         0, sinAlpha, cosAlpha);
 
-    auto sinBeta = S{"sin", small::beta};
-    auto cosBeta = S{"cos", small::beta};
+    auto sinBeta = S{sin, small::beta};
+    auto cosBeta = S{cos, small::beta};
 
-    betaMatrix.Assign(
+    beta.matrix.Assign(
         cosBeta, 0, sinBeta,
         0, 1, 0,
         -1 * sinBeta, 0, cosBeta);
 
-    auto sinGamma = S{"sin", small::gamma};
-    auto cosGamma = S{"cos", small::gamma};
+    auto sinGamma = S{sin, small::gamma};
+    auto cosGamma = S{cos, small::gamma};
 
-    gammaMatrix.Assign(
+    gamma.matrix.Assign(
         cosGamma, -1 * sinGamma, 0,
         sinGamma, cosGamma, 0,
         0, 0, 1);
 
-    auto alphaMatrixName = fmt::format("R({})", small::alpha);
-    auto betaMatrixName = fmt::format("R({})", small::beta);
-    auto gammaMatrixName = fmt::format("R({})", small::gamma);
+    alpha.Print();
+    beta.Print();
+    gamma.Print();
 
-    fmt::print(
-        "{} (rotation about the x axis):\n",
-        alphaMatrixName);
+    settings::printCompact = true;
 
-    std::cout << alphaMatrix << std::endl;
-
-    fmt::print(
-        "{} (rotation about the y axis):\n",
-        betaMatrixName);
-
-    std::cout << betaMatrix << std::endl;
-
-    fmt::print(
-        "{} (rotation about the z axis):\n",
-        gammaMatrixName);
-
-    std::cout << gammaMatrix << std::endl;
-
-    fmt::print(
-        "\n{} * {} * {}:\n",
-        gammaMatrixName,
-        betaMatrixName,
-        alphaMatrixName);
-
-    std::cout << gammaMatrix * betaMatrix * alphaMatrix << std::endl;
-
-    fmt::print(
-        "\n{} * {} * {}:\n",
-        alphaMatrixName,
-        betaMatrixName,
-        gammaMatrixName);
-
-    std::cout << alphaMatrix * betaMatrix * gammaMatrix << std::endl;
-
-    fmt::print(
-        "\n{} * {} * {}:\n",
-        betaMatrixName,
-        gammaMatrixName,
-        alphaMatrixName);
-
-    std::cout << betaMatrix * gammaMatrix * alphaMatrix << std::endl;
+    PrintRotation(gamma, beta, alpha);
+    PrintRotation(beta, gamma, alpha);
+    PrintRotation(gamma, alpha, beta);
+    PrintRotation(alpha, beta, gamma);
+    PrintRotation(alpha, gamma, beta);
+    PrintRotation(beta, gamma, alpha);
+    PrintRotation(beta, alpha, gamma);
 
     return 0;
 }

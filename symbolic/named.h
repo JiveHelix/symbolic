@@ -13,9 +13,9 @@
 
 
 #include <string>
-#include "symbol.h"
-#include "operator.h"
-#include "value.h"
+#include "symbolic/symbol.h"
+#include "symbolic/expression.h"
+#include "symbolic/value.h"
 
 
 class Named: public Symbol
@@ -33,9 +33,7 @@ public:
 
     bool IsNamed() const override;
 
-    bool operator==(const Named &other) const;
-
-    bool operator!=(const Named &other) const;
+    bool IsTrig() const override;
 
     bool operator<(const Named &other) const;
 
@@ -43,7 +41,15 @@ public:
 
     Pointer ClearScalar() const override;
 
+    Pointer GetPower() const override;
+
+    Pointer ClearPower() const override;
+
     Pointer MultiplyScalar(Pointer scalar) const override;
+
+    Pointer AddPower(Pointer power) const override;
+
+    Pointer MultiplyPower(Pointer power) const override;
 
     Pointer operator+(Pointer other) const override;
 
@@ -59,10 +65,57 @@ public:
 
     std::ostream & ToStream(std::ostream &output) const override;
 
+    Pointer Copy() const override;
+
+    Pointer Invert() const override;
+
+    bool ScalarsAdd(Pointer other) const override;
+
+    bool PowersAdd(Pointer other) const override;
+
+    bool Equals(Pointer other) const override;
+
+    bool IsOne() const override;
+
+    bool IsNegativeOne() const override;
+
+    bool IsZero() const override;
+
+    bool IsNegative() const override;
+
+    bool SortProduct(Pointer other) const override;
+
+    template<typename T>
+    std::optional<T> GetValue() const
+    {
+        auto value = this->name_.GetValue<double>();
+
+        if (!value)
+        {
+            return {};
+        }
+
+        auto result =
+            this->scalar_.GetValue<double>()
+            * std::pow(*value, this->power_.GetValue<double>());
+
+        if constexpr (std::is_integral_v<T>)
+        {
+            return static_cast<T>(std::round(result));
+        }
+        else
+        {
+            return static_cast<T>(result);
+        }
+    }
+
+    std::shared_ptr<Arg> GetArg()
+    {
+        return this->name_.GetArg();
+    }
+
 private:
     SymbolName name_;
-    Value value_;
+    Value scalar_;
     Value power_;
 };
-
-

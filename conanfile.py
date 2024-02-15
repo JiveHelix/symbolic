@@ -35,4 +35,5 @@ class MadlabConan(ConanFile):
 
     def requirements(self):
         self.requires("jive/[~1.1]")
+        self.requires("tau/[~1.10]")
         self.requires("fmt/[~10]")

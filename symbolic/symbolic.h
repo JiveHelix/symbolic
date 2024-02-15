@@ -16,3 +16,4 @@
 #include <symbolic/symbol.h>
 #include <symbolic/matrix.h>
 #include <symbolic/greek.h>
+#include <symbolic/settings.h>

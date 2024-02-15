@@ -11,7 +11,7 @@
 
 #include "named.h"
 
-#include <map>
+#include <cassert>
 
 
 using Pointer = typename Symbol::Pointer;
@@ -20,7 +20,7 @@ using Pointer = typename Symbol::Pointer;
 Named::Named(const SymbolName &name)
     :
     name_(name),
-    value_(1),
+    scalar_(1),
     power_(1)
 {
 
@@ -33,7 +33,7 @@ Named::Named(
     Pointer power)
     :
     name_(name),
-    value_(1),
+    scalar_(1),
     power_(1)
 {
     auto valuePointer = dynamic_cast<Value *>(value.get());
@@ -43,7 +43,7 @@ Named::Named(
         throw std::runtime_error("Expected a Value");
     }
 
-    this->value_ = *valuePointer;
+    this->scalar_ = *valuePointer;
 
     auto powerPointer = dynamic_cast<Value *>(power.get());
 
@@ -62,7 +62,7 @@ Named::Named(
     const Value &power)
     :
     name_(name),
-    value_(value),
+    scalar_(value),
     power_(power)
 {
 
@@ -75,7 +75,7 @@ Named::Named(
     const Value &power)
     :
     name_(name),
-    value_(1),
+    scalar_(1),
     power_(power)
 {
     auto valuePointer = dynamic_cast<Value *>(value.get());
@@ -85,7 +85,7 @@ Named::Named(
         throw std::runtime_error("Expected a Value");
     }
 
-    this->value_ = *valuePointer;
+    this->scalar_ = *valuePointer;
 }
 
 
@@ -95,6 +95,13 @@ bool Named::IsNamed() const
 }
 
 
+bool Named::IsTrig() const
+{
+    return this->name_.IsTrig();
+}
+
+
+#if 0
 bool Named::operator==(const Named &other) const
 {
     if (other.name_ != this->name_)
@@ -102,7 +109,7 @@ bool Named::operator==(const Named &other) const
         return false;
     }
 
-    return this->value_ == other.value_ && this->power_ == other.power_;
+    return this->scalar_ == other.scalar_ && this->power_ == other.power_;
 }
 
 
@@ -110,6 +117,7 @@ bool Named::operator!=(const Named &other) const
 {
     return !this->operator==(other);
 }
+#endif
 
 
 bool Named::operator<(const Named &other) const
@@ -125,7 +133,7 @@ bool Named::operator<(const Named &other) const
 
 Pointer Named::GetScalar() const
 {
-    return std::make_shared<Value>(this->value_);
+    return std::make_shared<Value>(this->scalar_);
 }
 
 
@@ -135,12 +143,56 @@ Pointer Named::ClearScalar() const
 }
 
 
+Pointer Named::GetPower() const
+{
+    return std::make_shared<Value>(this->power_);
+}
+
+
+Pointer Named::ClearPower() const
+{
+    return std::make_shared<Named>(this->name_, this->scalar_, Value(1));
+}
+
+
 Pointer Named::MultiplyScalar(Pointer scalar) const
 {
     return std::make_shared<Named>(
         this->name_,
-        scalar * std::make_shared<Value>(this->value_),
+        this->scalar_ * scalar,
         this->power_);
+}
+
+
+Pointer Named::AddPower(Pointer power) const
+{
+    auto powerValue = dynamic_cast<Value *>(power.get());
+
+    if (!powerValue)
+    {
+        throw std::runtime_error("Power must be a value");
+    }
+
+    return std::make_shared<Named>(
+        this->name_,
+        this->scalar_.Copy(),
+        this->power_ + *powerValue);
+}
+
+
+Pointer Named::MultiplyPower(Pointer power) const
+{
+    auto powerValue = dynamic_cast<Value *>(power.get());
+
+    if (!powerValue)
+    {
+        throw std::runtime_error("Power must be a value");
+    }
+
+    return std::make_shared<Named>(
+        this->name_,
+        this->scalar_.Copy(),
+        this->power_ * *powerValue);
 }
 
 
@@ -154,7 +206,7 @@ Pointer Named::operator+(Pointer other) const
                 && otherNamed->power_ == this->power_)
         {
             // This is the same symbol and can be added.
-            auto valueResult = this->value_ + otherNamed->value_;
+            auto valueResult = this->scalar_ + otherNamed->scalar_;
 
             if (valueResult == 0)
             {
@@ -168,7 +220,7 @@ Pointer Named::operator+(Pointer other) const
         }
     }
 
-    return Operator::Add(std::make_shared<Named>(*this), other);
+    return Expression::Add(std::make_shared<Named>(*this), other);
 }
 
 
@@ -181,7 +233,7 @@ Pointer Named::operator-(Pointer other) const
         if (otherNamed->name_ == this->name_
                 && otherNamed->power_ == this->power_)
         {
-            auto valueResult = this->value_ - otherNamed->value_;
+            auto valueResult = this->scalar_ - otherNamed->scalar_;
 
             if (valueResult == 0)
             {
@@ -195,13 +247,13 @@ Pointer Named::operator-(Pointer other) const
         }
     }
 
-    return Operator::Subtract(std::make_shared<Named>(*this), other);
+    return Expression::Subtract(std::make_shared<Named>(*this), other);
 }
 
 
 Pointer Named::operator*(const Value &other) const
 {
-    auto valueResult = this->value_ * other;
+    auto valueResult = this->scalar_ * other;
     auto asValue = dynamic_cast<Value *>(valueResult.get());
 
     assert(asValue);
@@ -227,7 +279,7 @@ Pointer Named::operator/(const Value &other) const
 
     return std::make_shared<Named>(
         this->name_,
-        this->value_ / other,
+        this->scalar_ / other,
         this->power_);
 }
 
@@ -244,12 +296,12 @@ Pointer Named::operator*(Pointer other) const
 
             if (resultPower == 0)
             {
-                return std::make_shared<Value>(this->value_);
+                return std::make_shared<Value>(this->scalar_);
             }
 
             return std::make_shared<Named>(
                 this->name_,
-                this->value_ * otherNamed->value_,
+                this->scalar_ * otherNamed->scalar_,
                 resultPower);
         }
     }
@@ -261,7 +313,7 @@ Pointer Named::operator*(Pointer other) const
         return this->operator*(*otherValue);
     }
 
-    return Operator::Multiply(std::make_shared<Named>(*this), other);
+    return Expression::Multiply(std::make_shared<Named>(*this), other);
 }
 
 
@@ -277,12 +329,12 @@ Pointer Named::operator/(Pointer other) const
 
             if (resultPower == 0)
             {
-                return std::make_shared<Value>(this->value_);
+                return std::make_shared<Value>(this->scalar_);
             }
 
             return std::make_shared<Named>(
                 this->name_,
-                this->value_ * otherNamed->value_,
+                this->scalar_ * otherNamed->scalar_,
                 resultPower);
         }
     }
@@ -294,27 +346,191 @@ Pointer Named::operator/(Pointer other) const
         return this->operator/(*otherValue);
     }
 
-    return Operator::Divide(std::make_shared<Named>(*this), other);
+    return Expression::Divide(std::make_shared<Named>(*this), other);
 }
 
 
 std::ostream & Named::ToStream(std::ostream &output) const
 {
-    if (this->power_ == 0)
+    auto value = this->GetValue<int>();
+
+    if (value)
     {
-        return output << this->value_;
+        return output << *value;
     }
 
-    if (this->value_ == -1)
+    if (this->power_ == 0)
+    {
+        return output << this->scalar_;
+    }
+
+    if (this->scalar_ == -1)
     {
         output << "-";
     }
-    else if (this->value_ != 1)
+    else if (this->scalar_ != 1)
     {
-        output << this->value_ << "*";
+        output << this->scalar_ << "*";
     }
 
     this->name_.ToStream(output, this->power_);
 
     return output;
+}
+
+
+Pointer Named::Copy() const
+{
+    return std::make_shared<Named>(this->name_, this->scalar_, this->power_);
+}
+
+
+Pointer Named::Invert() const
+{
+    return std::make_shared<Named>(
+        this->name_,
+        this->scalar_.Invert(),
+        this->power_ * -1);
+}
+
+
+bool Named::ScalarsAdd(Pointer other) const
+{
+    auto otherNamed = dynamic_cast<Named *>(other.get());
+
+    if (!otherNamed)
+    {
+        return false;
+    }
+
+    return this->name_ == otherNamed->name_
+            && this->power_ == otherNamed->power_;
+}
+
+
+bool Named::PowersAdd(Pointer other) const
+{
+    auto otherNamed = dynamic_cast<Named *>(other.get());
+
+    if (!otherNamed)
+    {
+        return false;
+    }
+
+    return this->name_ == otherNamed->name_;
+}
+
+
+bool Named::Equals(Pointer other) const
+{
+    auto otherNamed = dynamic_cast<Named *>(other.get());
+
+    if (!otherNamed)
+    {
+        return false;
+    }
+
+    return this->name_ == otherNamed->name_
+            && this->power_ == otherNamed->power_
+            && this->scalar_ == otherNamed->scalar_;
+}
+
+
+bool Named::IsOne() const
+{
+    if (this->power_ == 0 && this->scalar_ == 1)
+    {
+        return true;
+    }
+
+    auto value = this->name_.GetValue<double>();
+
+    if (value)
+    {
+        return std::abs(*value - 1.0) < 0.001;
+    }
+    
+    return false;
+}
+
+
+bool Named::IsNegativeOne() const
+{
+    if (this->power_ == 0 && this->scalar_ == -1)
+    {
+        return true;
+    }
+
+    auto value = this->name_.GetValue<double>();
+
+    if (value)
+    {
+        return std::abs(*value + 1.0) < 0.001;
+    }
+    
+    return false;
+}
+
+
+bool Named::IsZero() const
+{
+    auto value = this->name_.GetValue<double>();
+
+    if (value)
+    {
+        return std::abs(*value) < 0.001;
+
+    }
+
+    return (this->scalar_ == 0);
+}
+
+
+bool Named::IsNegative() const
+{
+    auto value = this->name_.GetValue<double>();
+
+    if (!value)
+    {
+        // Without a specific value, the sign of this term is just the sign of
+        // the scalar.
+        return this->scalar_ < 0;
+    }
+
+    if (!this->power_.IsIntegral())
+    {
+        // Cannot say definitively whether result will be negative (or
+        // imaginary).
+        return false;
+    }
+
+    if (this->power_.GetIntegral() % 2 == 0)
+    {
+        // Even power. Any value will be positive.
+        // scalar_ determines the sign.
+        return this->scalar_ < 0;
+    }
+
+    // Odd power.
+    if (*value < 0)
+    {
+        // value will still be negative after exponentiation.
+        return this->scalar_ > 0;
+    }
+
+    // value is positive. Odd power is still positive.
+    return this->scalar_ < 0;
+}
+
+
+bool Named::SortProduct(Pointer other) const
+{
+    auto otherNamed = dynamic_cast<Named *>(other.get());
+
+    if (!otherNamed)
+    {
+        return false;
+    }
+
+    return this->name_.IsTrig() && otherNamed->name_.IsTrig();
 }

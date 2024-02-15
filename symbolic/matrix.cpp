@@ -9,9 +9,11 @@
   * Licensed under the MIT license. See LICENSE file.
 **/
 
-#include "matrix.h"
+#include "symbolic/matrix.h"
+#include "symbolic/settings.h"
 
 #include <fmt/core.h>
+#include <iostream>
 
 
 using Pointer = typename Symbol::Pointer;
@@ -86,7 +88,7 @@ Matrix Matrix::operator/(S scalar) const
 
 Matrix Matrix::operator*(const Matrix &other) const
 {
-    if (this->rows_ != other.columns_)
+    if (this->columns_ != other.rows_)
     {
         throw std::runtime_error("Incompatible dimensions");
     }
@@ -137,8 +139,43 @@ size_t Matrix::GetColumnWidth() const
     return width;
 }
 
+std::ostream & Matrix::ToStreamCompact(std::ostream &output) const
+{
+    std::vector<size_t> widths;
+
+    for (size_t column = 0; column < this->columns_; ++column)
+    {
+        widths.push_back(this->values_[column].GetColumnWidth());
+    }
+
+    for (size_t row = 0; row < this->rows_; ++row)
+    {
+        output << "[";
+
+        for (size_t column = 0; column < this->columns_; ++column)
+        {
+            std::ostringstream stringStream;
+            this->operator()(row, column)->ToStream(stringStream);
+
+            output << fmt::format(
+                "{:^{}}",
+                stringStream.str(),
+                widths[column] + 2);
+        }
+
+        output << "]\n";
+    }
+
+    return output;
+}
+
 std::ostream & Matrix::ToStream(std::ostream &output) const
 {
+    if (settings::printCompact)
+    {
+        return this->ToStreamCompact(output);
+    }
+
     size_t columnWidth = this->GetColumnWidth() + 2;
 
     for (size_t row = 0; row < this->rows_; ++row)
@@ -150,18 +187,10 @@ std::ostream & Matrix::ToStream(std::ostream &output) const
             std::ostringstream stringStream;
             this->operator()(row, column)->ToStream(stringStream);
 
-#if 0
-            output << fmt::format(
-                "{:^{}}{}",
-                stringStream.str(),
-                columnWidth,
-                (column < this->columns_ - 1) ? "," : "");
-#else
             output << fmt::format(
                 "{:^{}}",
                 stringStream.str(),
                 columnWidth);
-#endif
         }
 
         output << "]\n";

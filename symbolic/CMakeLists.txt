@@ -18,10 +18,12 @@ target_link_libraries(
 target_sources(
     symbolic
     PRIVATE
+    angle_sums.cpp
     greek.cpp
     matrix.cpp
     named.cpp
-    operator.cpp
+    expression.cpp
+    settings.cpp
     symbol.cpp
     value.cpp)
 

@@ -85,6 +85,8 @@ public:
 
     std::ostream & ToStream(std::ostream &output) const;
 
+    std::ostream & ToStreamCompact(std::ostream &output) const;
+
     Matrix & operator=(const std::vector<S> &symbols);
 
     template<typename ...Args>

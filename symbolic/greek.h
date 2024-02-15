@@ -13,6 +13,7 @@
 
 
 #include <ostream>
+#include <map>
 
 
 namespace greek
@@ -79,6 +80,12 @@ namespace capital
 
 
 std::ostream & Display(std::ostream &);
+
+
+extern const std::map<std::string, int> sortOrder;
+
+
+bool IsGreek(const std::string &value);
 
 
 } // end namespace greek
