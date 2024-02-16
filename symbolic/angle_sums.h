@@ -6,21 +6,21 @@
 #include "symbolic/symbolic.h"
 
 
-struct SumAndDifference
+struct Identity
 {
     using Pointer = typename Symbol::Pointer;
 
-    Pointer cosSumName;
-    Pointer cosSum;
+    Pointer name;
+    Pointer expression;
+};
 
-    Pointer sinSumName;
-    Pointer sinSum;
 
-    Pointer cosDifferenceName;
-    Pointer cosDifference;
-
-    Pointer sinDifferenceName;
-    Pointer sinDifference;
+struct SumAndDifference
+{
+    Identity cosSum;
+    Identity sinSum;
+    Identity cosDifference;
+    Identity sinDifference;
 
     SumAndDifference(const std::string &first, const std::string &second);
 };

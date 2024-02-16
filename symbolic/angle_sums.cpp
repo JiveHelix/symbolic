@@ -33,21 +33,21 @@ SumAndDifference::SumAndDifference(
         -1 * sinSecond, cosSecond);
 
     auto angleSumName = fmt::format("{} + {}", first, second);
-    this->cosSumName = S("cos", angleSumName);
-    this->sinSumName = S("sin", angleSumName);
+    this->cosSum.name = S("cos", angleSumName);
+    this->sinSum.name = S("sin", angleSumName);
 
     auto angleDifferenceName = fmt::format("{} - {}", first, second);
-    this->cosDifferenceName = S("cos", angleDifferenceName);
-    this->sinDifferenceName = S("sin", angleDifferenceName);
+    this->cosDifference.name = S("cos", angleDifferenceName);
+    this->sinDifference.name = S("sin", angleDifferenceName);
 
     sum = positive * a;
     difference = negative * a;
 
-    this->cosSum = sum(0, 0);
-    this->sinSum = sum(1, 0);
+    this->cosSum.expression = sum(0, 0);
+    this->sinSum.expression = sum(1, 0);
 
-    this->cosDifference = difference(0, 0);
-    this->sinDifference = difference(1, 0);
+    this->cosDifference.expression = difference(0, 0);
+    this->sinDifference.expression = difference(1, 0);
 }
 
 
@@ -55,18 +55,35 @@ std::ostream & operator<<(
     std::ostream &output,
     const SumAndDifference &value)
 {
-    output << value.cosSumName << ": " << value.cosSum << '\n';
-    output << value.sinSumName << ": " << value.sinSum << '\n';
-    output << value.cosDifferenceName << ": " << value.cosDifference << '\n';
-    output << value.sinDifferenceName << ": " << value.sinDifference << '\n';
+    output << value.cosSum.name << ": " << value.cosSum.expression << '\n';
+    output << value.sinSum.name << ": " << value.sinSum.expression << '\n';
+
+    output << value.cosDifference.name << ": "
+        << value.cosDifference.expression << '\n';
+
+    output << value.sinDifference.name << ": "
+        << value.sinDifference.expression << '\n';
 
     return output;
 }
 
 
+void CheckIdentity(Symbol::Pointer &element, const Identity &identity)
+{
+    if (element->Equals(identity.expression))
+    {
+        element = identity.name;
+    }
+    else if ((element * -1)->Equals(identity.expression))
+    {
+        element = identity.name * -1;
+    }
+}
+
+
 void ReplaceElement(Matrix &matrix, size_t row, size_t column)
 {
-    auto element = matrix(row, column);
+    auto &element = matrix(row, column);
 
     if (!element->IsExpression())
     {
@@ -106,43 +123,10 @@ void ReplaceElement(Matrix &matrix, size_t row, size_t column)
         *leftNamed->GetArg(),
         *rightNamed->GetArg());
 
-    assert(sums.sinSum->Equals(sums.sinSum));
-
-    if (element->Equals(sums.sinSum))
-    {
-        matrix(row, column) = sums.sinSumName; 
-    }
-    else if ((element * -1)->Equals(sums.sinSum))
-    {
-        matrix(row, column) = sums.sinSumName * -1; 
-    }
-
-    else if (element->Equals(sums.cosSum))
-    {
-        matrix(row, column) = sums.cosSumName; 
-    }
-    else if ((element * -1)->Equals(sums.cosSum))
-    {
-        matrix(row, column) = sums.cosSumName * -1; 
-    }
-
-    else if (element->Equals(sums.cosDifference))
-    {
-        matrix(row, column) = sums.cosDifferenceName; 
-    }
-    else if ((element * -1)->Equals(sums.cosDifference))
-    {
-        matrix(row, column) = sums.cosDifferenceName * -1; 
-    }
-
-    else if (element->Equals(sums.sinDifference))
-    {
-        matrix(row, column) = sums.sinDifferenceName; 
-    }
-    else if ((element * -1)->Equals(sums.sinDifference))
-    {
-        matrix(row, column) = sums.sinDifferenceName * -1; 
-    }
+    CheckIdentity(element, sums.sinSum);
+    CheckIdentity(element, sums.cosSum);
+    CheckIdentity(element, sums.sinDifference);
+    CheckIdentity(element, sums.cosDifference);
 }
 
 
